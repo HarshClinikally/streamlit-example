@@ -1,97 +1,64 @@
-import pandas as pd
 import streamlit as st
-import matplotlib.pyplot as plt
+import pandas as pd
+import plotly.express as px
 from statsmodels.tsa.seasonal import seasonal_decompose
 
-# Error handling for file path
-try:
-  file_path = 'category_sales_dat.csv'  # Update the file path if needed
-  data = pd.read_csv(file_path)
-except FileNotFoundError:
-  st.error(f"Error: File '{file_path}' not found. Please check the file path and try again.")
-
-# Set the 'product_type' as the index with error handling
-try:
-  data.set_index('product_type', inplace=True)
-except KeyError:
-  st.error(f"Error: Column 'product_type' not found in the data. Please check your CSV file.")
-
-# Transpose the data
-data = data.T
-
-# Remove the 'Grand Total' row
-data = data.drop(['Grand Total'], axis=0)
-
-# Convert the index to datetime with error handling
-try:
-  data.index = pd.to_datetime(data.index, format='%Y-%b')
-except ValueError:
-  st.error(f"Error: Invalid date format. Please ensure the date format in your CSV matches '%Y-%b'.")
-
-# Check the number of observations for each category
-observations_count = data.count()
-
-# Separate categories based on length of data
-categories_with_sufficient_data = observations_count[observations_count >= 24].index
-categories_with_insufficient_data = observations_count[observations_count < 24].index
-
-# Streamlit App
-st.title('Seasonality Analysis of Product Categories')
-
-# Category selection
-selected_category = st.selectbox(
-    'Select a Product Category',
-    data.columns
-)
-
-# Display the selected category data
-st.write(f"Sales data for {selected_category}:")
-
-# Display original sales data
-fig, ax = plt.subplots()
-ax.plot(data.index, data[selected_category], label='Original Sales')
-ax.set_title(f'Sales Data of {selected_category}')
-ax.set_xlabel('Date')
-ax.set_ylabel('Sales')
-st.pyplot(fig)
-
-# Perform analysis based on data sufficiency
-if selected_category in categories_with_sufficient_data:
-    # Seasonal decomposition
+# Function to load and process data (assuming CSV file is uploaded)
+def load_data(file_uploader):
     try:
-        result = seasonal_decompose(data[selected_category].dropna(), model='multiplicative', period=12)
+        data = pd.read_csv(file_uploader)
+        data.set_index('product_type', inplace=True)
+        data = data.T
+        data.drop('Grand Total', axis=0, inplace=True)
+        data.index = pd.to_datetime(data.index, format='%Y-%b')
+        return data
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None
 
-        # Plot decomposition
-        st.write(f"Seasonal Decomposition of {selected_category}:")
-        fig, (ax1, ax2, ax3, ax4) = plt.subplots(4, 1, figsize=(10, 8))
-        result.observed.plot(ax=ax1)
-        ax1.set_ylabel('Observed')
-        result.trend.plot(ax=ax2)
-        ax2.set_ylabel('Trend')
-        result.seasonal.plot(ax=ax3)
-        ax3.set_ylabel('Seasonal')
-        result.resid.plot(ax=ax4)
-        ax4.set_ylabel('Residual')
-        fig.suptitle(f'Seasonal Decomposition of {selected_category}', y=0.92)
-        st.pyplot(fig)
-    except:
-        st.error(f"Error: An error occurred during seasonal decomposition. Please check your data.")
+# Streamlit app layout
+st.title('Seasonality Analysis')
 
+# Upload data section
+uploaded_file = st.file_uploader("Choose a CSV file:", type="csv")
+
+# Load data if a file is uploaded
+if uploaded_file is not None:
+    data = load_data(uploaded_file)
+
+    if data is not None:
+        # Available categories for dropdown
+        category_options = data.columns.tolist()
+
+        # Select category using dropdown
+        selected_category = st.selectbox('Select Product Category:', category_options)
+
+        # Show/Hide labels toggle checkbox
+        show_labels = st.checkbox('Show Component Labels', value=True)
+
+        # Perform seasonal decomposition and display plot
+        if selected_category in data.columns:
+            try:
+                result = seasonal_decompose(data[selected_category].dropna(), model='multiplicative', period=12)
+
+                # Create seasonal decomposition plot using Plotly Express
+                fig_decomp = px.subplots(rows=4, cols=1)
+                fig_decomp.add_trace(px.line(result, x=result.index, y='observed', title='Observed' if show_labels else ''), showlegend=show_labels)
+                fig_decomp.add_trace(px.line(result, x=result.index, y='trend', title='Trend' if show_labels else ''), row=2, col=1, showlegend=show_labels)
+                fig_decomp.add_trace(px.line(result, x=result.index, y='seasonal', title='Seasonal' if show_labels else ''), row=3, col=1, showlegend=show_labels)
+                fig_decomp.add_trace(px.line(result, x=result.index, y='resid', title='Residual' if show_labels else ''), row=4, col=1, showlegend=show_labels)
+                fig_decomp.update_layout(
+                    title=f'Seasonal Decomposition of {selected_category}',
+                    xaxis_title='Date'
+                )
+
+                # Display the plot
+                st.plotly_chart(fig_decomp)
+            except Exception as e:
+                st.error(f"Error generating plot for {selected_category}: {e}")
+        else:
+            st.error(f"Category '{selected_category}' not found.")
+    else:
+        st.info("Data loading failed. Please try again.")
 else:
-    # Calculate moving average
-    window_size = 3  # 3-month moving average
-    data[selected_category] = data[selected_category].astype(float)  # Ensure data is in float format
-    moving_avg = data[selected_category].rolling(window=window_size).mean()
-
-    # Plot moving average
-    st.write(f"Moving Average of {selected_category}:")
-    fig, ax = plt.subplots()
-    ax.plot(data.index, data[selected_category], label='Original Sales')
-    ax.plot(data.index, moving_avg, label='Moving Average', color='red')
-    ax.set_title(f'Moving Average of {selected_category}')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Sales')
-    ax.legend()
-    st.pyplot(fig)
-
-# Run the Streamlit
+    st.info("Please upload a CSV file to proceed.")
