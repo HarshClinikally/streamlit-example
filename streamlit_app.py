@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px  # Assuming upgraded Plotly Express
-
-# Alternative (if upgrade not possible):
-# import plotly.graph_objects as go  # Import for Plotly.py subplots
-
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 # Function to load and process data (assuming CSV file is uploaded)
@@ -45,17 +42,21 @@ if uploaded_file is not None:
             try:
                 result = seasonal_decompose(data[selected_category].dropna(), model='multiplicative', period=12)
 
-                # Create seasonal decomposition plot using Plotly Express (upgraded)
-                fig_decomp = px.subplots(rows=4, cols=1)
-                fig_decomp.add_trace(px.line(result, x=result.index, y='observed', title='Observed' if show_labels else ''), showlegend=show_labels)
-                fig_decomp.add_trace(px.line(result, x=result.index, y='trend', title='Trend' if show_labels else ''), row=2, col=1, showlegend=show_labels)
-                fig_decomp.add_trace(px.line(result, x=result.index, y='seasonal', title='Seasonal' if show_labels else ''), row=3, col=1, showlegend=show_labels)
-                fig_decomp.add_trace(px.line(result, x=result.index, y='resid', title='Residual' if show_labels else ''), row=4, col=1, showlegend=show_labels)
-                fig_decomp.update_layout(
-                    title=f'Seasonal Decomposition of {selected_category}',
-                    xaxis_title='Date'
-                )
+                # Create seasonal decomposition plot using Plotly
+                fig_decomp = make_subplots(rows=4, cols=1, subplot_titles=[
+                    'Observed' if show_labels else '',
+                    'Trend' if show_labels else '',
+                    'Seasonal' if show_labels else '',
+                    'Residual' if show_labels else ''
+                ])
+                
+                fig_decomp.add_trace(go.Scatter(x=result.observed.index, y=result.observed, mode='lines', name='Observed'), row=1, col=1)
+                fig_decomp.add_trace(go.Scatter(x=result.trend.index, y=result.trend, mode='lines', name='Trend'), row=2, col=1)
+                fig_decomp.add_trace(go.Scatter(x=result.seasonal.index, y=result.seasonal, mode='lines', name='Seasonal'), row=3, col=1)
+                fig_decomp.add_trace(go.Scatter(x=result.resid.index, y=result.resid, mode='lines', name='Residual'), row=4, col=1)
 
+                fig_decomp.update_layout(height=800, width=800, title_text=f'Seasonal Decomposition of {selected_category}')
+                
                 # Display the plot
                 st.plotly_chart(fig_decomp)
             except Exception as e:
