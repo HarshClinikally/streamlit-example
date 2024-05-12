@@ -1,6 +1,10 @@
 import streamlit as st
 import pandas as pd
-import plotly.express as px
+import plotly.express as px  # Assuming upgraded Plotly Express
+
+# Alternative (if upgrade not possible):
+# import plotly.graph_objects as go  # Import for Plotly.py subplots
+
 from statsmodels.tsa.seasonal import seasonal_decompose
 
 # Function to load and process data (assuming CSV file is uploaded)
@@ -41,7 +45,7 @@ if uploaded_file is not None:
             try:
                 result = seasonal_decompose(data[selected_category].dropna(), model='multiplicative', period=12)
 
-                # Create seasonal decomposition plot using Plotly Express
+                # Create seasonal decomposition plot using Plotly Express (upgraded)
                 fig_decomp = px.subplots(rows=4, cols=1)
                 fig_decomp.add_trace(px.line(result, x=result.index, y='observed', title='Observed' if show_labels else ''), showlegend=show_labels)
                 fig_decomp.add_trace(px.line(result, x=result.index, y='trend', title='Trend' if show_labels else ''), row=2, col=1, showlegend=show_labels)
